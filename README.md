@@ -33,7 +33,7 @@ The underlying concept involved designing an automated system wherein developers
 The workflow designed establishes a systematic progression from code commit through live deployment:
 
 
-a)  **Code Commit:** Commit and push new code or modifications to the primary branch of the GitHub repository.
+a)  Code Commit: Commit and push new code or modifications to the primary branch of the GitHub repository.
 b)  **GitHub Actions Trigger:** Upon detecting the push event, GitHub Actions automatically activates the CI/CD workflow specified in .github/workflows/deploy.yml.
 c)  **Pipeline Execution:** The pipeline operates through four sequential stages on the self-hosted AWS EC2 runner:
     * Checkout & Setup: Clones the latest source code from GitHub and transfers it to the runner environment.
