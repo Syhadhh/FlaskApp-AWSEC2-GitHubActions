@@ -32,7 +32,6 @@ The underlying concept involved designing an automated system wherein developers
 <a name="2-designed-architecture"></a>
 The workflow designed establishes a systematic progression from code commit through live deployment:
 
-
 a)  Code Commit: Commit and push new code or modifications to the primary branch of the GitHub repository.
 b)  **GitHub Actions Trigger:** Upon detecting the push event, GitHub Actions automatically activates the CI/CD workflow specified in .github/workflows/deploy.yml.
 c)  **Pipeline Execution:** The pipeline operates through four sequential stages on the self-hosted AWS EC2 runner:
@@ -49,7 +48,7 @@ The infrastructures supporting this project comprised of a virtual server deploy
 
 a)  **Ubuntu 24.04 on a  t2.micro:** The **Ubuntu 24.04 LTS** image is to guarantee stability, security, and comprehensive long-term support for Docker and Flask. Besides, the **t2.micro** instance has 1 vCPU and 1 GiB RAM that provide sufficient computational resources and memory capacity for this project. GitHub Actions builds and tests the Docker image, hence EC2 doesn't need to perform the CI build. Considering a zero-cost workflow, the settings are applied as they are eligible for the AWS Free Tier. (AWS's current Free Tier documentation does not list t2.micro as an eligible instance for accounts created on or after July 15, 2025. the newer Free Tier rules, Ubuntu 24.04 + t3.micro may be the more relevant free-tier option.)
 
-2.  **Security Group Rules** The security group functions as a virtual firewall protecting  the server. Below are the rules established to allow the specific traffic needed:
+b)  **Security Group Rules** The security group functions as a virtual firewall protecting  the server. Below are the rules established to allow the specific traffic needed:
     * **Port 22 (SSH):** Essential for establishing secure terminal connections to the server via SSH/PuTTy (after converting the .pem key to .ppk using PuTTYgen), enabling initial system configuration and software installation.
     * **Port 5000 (Flask):** The designated port through which the Flask web application within the container operates, facilitating inbound web HTTP traffic to access the operational application.
     * **Port 80 (HTTP):** The conventional web protocol port configured to permit inbound HTTP web accessibility.
