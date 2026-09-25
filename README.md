@@ -11,9 +11,9 @@
 4. [Step 2: Install the Core Tools](#4-step-2-install-the-core-tools)
 5. [Step 3: Set Up GitHub Self-Hosted Runner](#5-step-3-set-up-github-self-hosted-runner)
 6. [Step 4: Configure GitHub Repository Files](#6-step-4-configure-github-repository-files)
-    * [The Dockerfile: A Blueprint for My App](#the-dockerfile-a-blueprint-for-my-app)
-    * [The `docker-compose.yml`: Orchestrating My Services](#the-docker-composeyml-orchestrating-my-services)
-    * [The Jenkinsfile: My Pipeline as Code](#the-jenkinsfile-my-pipeline-as-code)
+    * [The Dockerfile: The System's Blueprint](#the-dockerfile-system's-blueprint)
+    * [The Flask's Script: Define the Flask Application](#the-flask's-script-define-the-flassk-application)
+    * [The GitHub Actions Workflow: Pipeline as Code](#the-github-actions-workflow-pipeline-as-code)
 7. [Step 5: Bringing It All Together with a Jenkins Pipeline](#7-step-5-bringing-it-all-together-with-a-jenkins-pipeline)
 8. [Final Thoughts and Conclusion](#8-final-thoughts-and-conclusion)
 
@@ -71,62 +71,117 @@ c)  **Permissions:** Enabled and initiated the Docker daemon through the command
 An AWS EC2 server is configured as a self-hosted runner. This configuration enables the GitHub Actions workflow to execute deployments directly to the server where the application is hosted.
 
 a)  **Runner Registration:** Accessed Settings > Actions > Runners within the GitHub repository and chose New self-hosted runner for Linux (x64).
-b)  **Installation Steps on EC2:** Established a dedicated directory: `mkdir actions-runner && cd actions-runner`. Obtained and decompressed the most recent GitHub Actions runner package. Initialized the runner through `./config.sh --url <REPO_URL> --token <REGISTRATION_TOKEN>`.
-c)  **Activating the Agent:** Initiated the runner by executing ./run.sh within the PuTTY session to commence monitoring for incoming workflow jobs activated by GitHub commits.
+b)  **Installation Steps on EC2:** 
+   Established a dedicated directory: `mkdir actions-runner && cd actions-runner`.
+   Obtained and decompressed the most recent GitHub Actions runner package.
+   Initialized the  runner through `./config.sh --url <REPO_URL> --token 
+   <REGISTRATION_TOKEN>`.
+c)  **Activating the Agent:** Initiate the runner by executing `./run.sh` within the PuTTY session to commence monitoring for incoming workflow jobs activated by GitHub commits.
 
 ---
 
 ### **6. Step 4: Configure GitHub Repository Files**
 <a name="6-step-4-configure-github-repository-files"></a>
-The "brains" of my automation pipeline are three text files that I placed in my GitHub repository.
+The operational framework of this automation system is supported by three essential repository files.
 
-#### **The Dockerfile: A Blueprint for My App**
-<a name="the-dockerfile-a-blueprint-for-my-app"></a>
-The `Dockerfile` is a set of instructions for building a Docker image of my Flask application. It's like a recipe that ensures my application environment is identical every single time it's built.
-* **`FROM python:3.9-slim`**: I started with an official, lightweight Python image.
-* **`WORKDIR /app`**: This sets the working directory inside the container.
-* **`RUN apt-get update ...`**: I installed some system libraries needed by the Python MySQL client.
-* **`COPY requirements.txt .` & `RUN pip install ...`**: I copied the Python requirements file first and installed the dependencies. This is a clever optimization that uses Docker's caching. If my app code changes but my requirements don't, Docker doesn't need to re-install all the packages, making my builds much faster.
-* **`COPY . .`**: This copies the rest of my application code into the image.
-* **`CMD ["python", "app.py"]`**: This is the command that runs when the container starts.
+#### **The Dockerfile: The System's Blueprint**
+<a name="the-dockerfile-system's-blueprint"></a>
+The Dockerfile contains specifications of the procedures for constructing a consistent and reproducible container image designated for the Flask application:
+* **`FROM python:3.13-slim`**: Sets the base image for the container, -slim to keep the overall container size small and lightweight while still providing all essential Python runtime dependencies.
+* **`WORKDIR /app`**: Sets the working directory inside the container. Any subsequent commands (like COPY, RUN, or CMD) will be executed relative to this path (/app).
+* **`COPY requirements.txt app.py ./`**: Copies local files from the host machine into the container's file system.
+* **`RUN pip install --no-cache-dir -r requirements.txt`**: Executes a command to build the container image layer. InstallS all the Python dependencies listed inside `requirements.txt` (such as Flask). The `--no-cache-dir` flag disables saving the downloaded cache files, which further minimizes the final Docker image size.
+* **`EXPOSE 5000`**: Documents the port on which the container listens at runtime.
+* **`CMD ["python", "app.py"]`**: Defines the default command that runs when the container starts.
 
-#### **The `docker-compose.yml`: Orchestrating My Services**
-<a name="the-docker-composeyml-orchestrating-my-services"></a>
-This file is where I defined my entire 2-tier application.
-* **`services:`**: I defined two services: `mysql` and `flask`.
-* **`mysql:`**: This service uses the official `mysql` image from Docker Hub. I set environment variables for the database name and password. The `volumes` section is crucial: `mysql-data:/var/lib/mysql` creates a persistent volume. This means that even if I stop and remove the MySQL container, my data will not be lost.
-* **`flask:`**: This service doesn't pull an image; it **builds** one using the `Dockerfile` in the current directory (`build: .`). I passed the database credentials to it as environment variables.
-* **`depends_on:`**: This tells Docker to start the `mysql` container before it starts the `flask` container, which is essential since my app needs the database to be ready before it can connect.
-* **`networks:`**: I created a custom network named `two-tier`. This allows the Flask and MySQL containers to find each other easily by their service names (`mysql`) instead of having to figure out their internal IP addresses.
-* **`healthcheck:`**: This is a vital feature for reliability. Docker will periodically run these commands to ensure the containers are not just running, but are actually healthy and responsive.
+### **The Flask's Script: Define the Flask Application**
+<a name="the-flask's-script-define-the-flassk-application"></a>
+The app.py script serves as the basic web application backend:
+* **`from flask import Flask`**: Imports the Flask class from the flask library.
+* **`app = Flask(__name__)`**: Creates an instance of the Flask application.
+* **`@app.route('/')`**: Defines a decorator that binds a URL path to a specific Python function.
+* **`def home():
+         return "Hello Everyone from GitHub Actions - Happy Learning!"`**: Flask runs `home()` and sends the plain text string `"hello everyone from github actions happy learning"` back as the HTTP response rendered in the user's browser.
+* **`if __name__ == '__main__':`**: Checks if the script is being executed directly.
+* **`app.run(host='0.0.0.0', port=5000)`**: Starts the built-in Flask development web server.
 
-#### **The Jenkinsfile: My Pipeline as Code**
-<a name="the-jenkinsfile-my-pipeline-as-code"></a>
-This file defines my CI/CD pipeline using Jenkins' "pipeline-as-code" syntax. Keeping the pipeline definition in my source code repository means my automation logic is version-controlled, just like my application code.
+
+#### **The GitHub Actions Workflow: Pipeline as Code**
+<a name="the-github-actions-workflow-pipeline-as-code"></a>
+Defined under `github/workflows/deploy.yml`, this YAML file orchestrates all four of the CI/CD pipeline.
 ```groovy
-pipeline {
-    agent any
-    stages {
-        stage('Clone Code') {
-            steps {
-                git branch: 'main', url: '[https://github.com/your-username/your-repo.git](https://github.com/your-username/your-repo.git)'
-            }
-        }
-        stage('Build Docker Image') {
-            steps {
-                sh 'docker build -t flask-app:latest .'
-            }
-        }
-        stage('Deploy with Docker Compose') {
-            steps {
-                sh 'docker compose down || true'
-                sh 'docker compose up -d --build'
-            }
-        }
-    }
-}
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main   
+
+jobs:
+  checkout:
+    name: Checkout & Setup
+    runs-on: self-hosted   
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+  build:
+    name: Build & Push Image
+    runs-on: self-hosted
+    needs: checkout
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Log in to DockerHub
+        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+
+      - name: Build & Tag Docker Image
+        run: |
+          GIT_SHA=$(git rev-parse --short HEAD)
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/flask-app:$GIT_SHA .
+          docker tag ${{ secrets.DOCKERHUB_USERNAME }}/flask-app:$GIT_SHA ${{ secrets.DOCKERHUB_USERNAME }}/flask-app:latest
+
+      - name: Push Docker Image
+        run: |
+          GIT_SHA=$(git rev-parse --short HEAD)
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/flask-app:$GIT_SHA
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/flask-app:latest
+
+  scan:
+    name: Security Scan with Trivy
+    runs-on: self-hosted
+    needs: build
+    steps:
+      - name: Install Trivy
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y wget apt-transport-https gnupg lsb-release
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+          echo deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main | sudo tee /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update -y
+          sudo apt-get install -y trivy
+
+      - name: Scan latest Docker image
+        run: |
+          trivy image --exit-code 0 --severity HIGH,CRITICAL ${{ secrets.DOCKERHUB_USERNAME }}/flask-app:latest
+          trivy image --exit-code 1 --severity CRITICAL ${{ secrets.DOCKERHUB_USERNAME }}/flask-app:latest || echo "⚠️ Critical vulnerabilities found"
+
+  deploy:
+    name: Deploy on EC2
+    runs-on: self-hosted
+    needs: scan
+    steps:
+      - name: Deploy latest container
+        run: |
+          docker stop flask-app || true
+          docker rm flask-app || true
+          sleep 6
+          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/flask-app:latest
+          docker run -d --name flask-app -p 5000:5000 ${{ secrets.DOCKERHUB_USERNAME }}/flask-app:latest
+          sleep 6
+          docker system prune -f
 ```
-* **`agent any`**: This tells Jenkins it can run this pipeline on any available agent (in my case, the Jenkins server itself).
 * **`stages`**: I broke my pipeline into three logical stages:
     1.  **Clone Code:** Jenkins uses its Git plugin to clone my repository.
     2.  **Build Docker Image:** This step isn't strictly necessary since `docker compose` can also build, but I included it as an explicit step to make the process clearer.
