@@ -44,7 +44,7 @@ The underlying concept involved designing an automated system wherein developers
 <a name="3-designed-architecture"></a>
 The workflow designed establishes a systematic progression from code commit through live deployment:
 
-a)  Code Commit: Commit and push new code or modifications to the primary branch of the GitHub repository.
+a)  **Code Commit:** Commit and push new code or modifications to the primary branch of the GitHub repository.
 
 b)  **GitHub Actions Trigger:** Upon detecting the push event, GitHub Actions automatically activates the CI/CD workflow specified in .github/workflows/deploy.yml.
 
@@ -76,7 +76,9 @@ b)  **Security Group Rules** The security group functions as a virtual firewall 
 Upon establishing an SSH connection to the EC2 instance through PuTTY, the essential software and runtime infrastructure is installed and deployed:
 
 a)  **AWS EC2 instance:** executed Package Index Update (`sudo apt update -y`) to verify that all system repositories maintained current status.
+
 b)  **Docker (`docker.io`):** Installed Docker as the containerization agent by executing `sudo apt install docker.io -y`. It allows the application to be packaged in isolated ( Docker containers have separated processes, filesystems, and network environments from other containers and the host) and lightweight (a Docker container shares the host's kernel instead of including a separate full guest OS) manner which makes the environment reproducible across local development. Docker images is built and tested in GitHub Actions, and then the same image is deployed to AWS EC2.
+
 c)  **Permissions:** Enabled and initiated the Docker daemon through the command `sudo systemctl enable --now docker`. Modified the permissions assigned to the Docker socket (chmod 777 /var/run/docker.sock) to facilitate non-root users and the GitHub runner agent in executing Docker commands without the necessity of sudo privileges.
 
 
