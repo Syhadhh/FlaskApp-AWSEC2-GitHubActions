@@ -5,22 +5,34 @@
 ---
 
 ### **Table of Contents**
-1. [Project's Goal](#1-projects-goal)
-2. [Designed Architecture](#2-designed-architecture)
-3. [Step 1: Prepare AWS EC2 Server](#3-step-1-prepare-aws-ec2-server)
-4. [Step 2: Install the Core Tools](#4-step-2-install-the-core-tools)
-5. [Step 3: Set Up GitHub Self-Hosted Runner](#5-step-3-set-up-github-self-hosted-runner)
-6. [Step 4: Configure GitHub Repository Files](#6-step-4-configure-github-repository-files)
+1. [Problem Statement](#1-problem-statement)
+2. [Project's Goal](#2-projects-goal)
+3. [Designed Architecture](#3-designed-architecture)
+4. [Step 1: Prepare AWS EC2 Server](#4-step-1-prepare-aws-ec2-server)
+5. [Step 2: Install the Core Tools](#5-step-2-install-the-core-tools)
+6. [Step 3: Set Up GitHub Self-Hosted Runner](#6-step-3-set-up-github-self-hosted-runner)
+7. [Step 4: Configure GitHub Repository Files](#7-step-4-configure-github-repository-files)
     * [The Dockerfile: The System's Blueprint](#the-dockerfile-system's-blueprint)
     * [The Flask's Script: Define the Flask Application](#the-flask's-script-define-the-flassk-application)
     * [The GitHub Actions Workflow: Pipeline as Code](#the-github-actions-workflow-pipeline-as-code)
-7. [Step 5: Bringing It All Together with a Jenkins Pipeline](#7-step-5-bringing-it-all-together-with-a-jenkins-pipeline)
-8. [Final Thoughts and Conclusion](#8-final-thoughts-and-conclusion)
+8. [Step 5: Consolidating The GitHub Actions Pipeline](#8-step-5-consolidating-the-github-actions-pipeline)
+9. [Conclusion](#9-conclusion)
 
 ---
+### **1. Problem Statement**
+<a name="1-problem-statement"></a>
+In conventional software delivery methodologies, the manual deployment of web applications across development and production environments creates numerous operational constraints:
 
-### **1. Project's Goal**
-<a name="1-projects-goal"></a>
+Elevated Operational Burden: Technical personnel are required to manually authenticate into cloud infrastructure, retrieve updated code repositories, construct container images, and initiate service restarts—a labor-intensive procedure susceptible to configuration inconsistencies and service interruptions.
+
+Unvalidated Security Threats: Transferring container images directly into production environments without implementing automated vulnerability assessments exposes infrastructure to recognized CVEs and insecure base image components.
+
+Insufficient Deployment Documentation: The absence of automated version labeling mechanisms integrated with source control systems makes determining which specific commit version is presently deployed in production—or executing rollbacks following unsuccessful deployments—a protracted and unreliable undertaking.
+
+This project addresses these problems through the establishment of a comprehensive automated CI/CD infrastructure utilizing GitHub Actions on a dedicated AWS EC2 runner. The framework streamlines source code retrieval, Docker image compilation, dual-version identification ($GIT_SHA and latest), Trivy-based security assessment, and seamless container redeployment with zero service interruption.
+
+### **2. Project's Goal**
+<a name="2-projects-goal"></a>
 This objective of this project is to containerize a Flask web application utilizing Docker, perform vulnerability assessments on the container image, and fully automate the deployment workflow to an AWS EC2 instance.
 
 
@@ -28,22 +40,26 @@ The underlying concept involved designing an automated system wherein developers
 
 ---
 
-### **2. Designed Architecture**
-<a name="2-designed-architecture"></a>
+### **3. Designed Architecture**
+<a name="3-designed-architecture"></a>
 The workflow designed establishes a systematic progression from code commit through live deployment:
 
 a)  Code Commit: Commit and push new code or modifications to the primary branch of the GitHub repository.
+
 b)  **GitHub Actions Trigger:** Upon detecting the push event, GitHub Actions automatically activates the CI/CD workflow specified in .github/workflows/deploy.yml.
+
 c)  **Pipeline Execution:** The pipeline operates through four sequential stages on the self-hosted AWS EC2 runner:
     * Checkout & Setup: Clones the latest source code from GitHub and transfers it to the runner environment.
     * Build & Push: Authenticates with Docker Hub, constructs the Flask application Docker image, applies tags corresponding to both the Git SHA commit identifier and the latest version, and uploads both tags to Docker Hub.
     * Security Scan: Executes a Trivy vulnerability assessment on the constructed Docker image to detect significant security vulnerabilities.
     * Deploy on EC2: Terminates and removes any existing container instance, retrieves the most recent Docker image from Docker Hub, instantiates a new container with port 5000 mapping, and performs cleanup of unused images through docker system prune.
+    
 d)  **Live Application:** The updated Flask application operates within an isolated container on the AWS EC2 instance, processing incoming requests on port 5000.
+
 ---
 
-### **3. Step 1: Prepare AWS EC2 Server**
-<a name="3-step-1-prepare-aws-ec2-server"></a>
+### **5. Step 1: Prepare AWS EC2 Server**
+<a name="5-step-1-prepare-aws-ec2-server"></a>
 The infrastructures supporting this project comprised of a virtual server deployed in the AWS cloud, configured to simultaneously host the GitHub Actions runner and the live application container.
 
 a)  **Ubuntu 24.04 on a  t2.micro:** The **Ubuntu 24.04 LTS** image is to guarantee stability, security, and comprehensive long-term support for Docker and Flask. Besides, the **t2.micro** instance has 1 vCPU and 1 GiB RAM that provide sufficient computational resources and memory capacity for this project. GitHub Actions builds and tests the Docker image, hence EC2 doesn't need to perform the CI build. Considering a zero-cost workflow, the settings are applied as they are eligible for the AWS Free Tier. (AWS's current Free Tier documentation does not list t2.micro as an eligible instance for accounts created on or after July 15, 2025. the newer Free Tier rules, Ubuntu 24.04 + t3.micro may be the more relevant free-tier option.)
@@ -66,8 +82,8 @@ c)  **Permissions:** Enabled and initiated the Docker daemon through the command
 
 ---
 
-### **5. Step 3: Set Up GitHub Self-Hosted Runner**
-<a name="5-step-3-set-up-github-self-hosted-runner"></a>
+### **6. Step 3: Set Up GitHub Self-Hosted Runner**
+<a name="6-step-3-set-up-github-self-hosted-runner"></a>
 An AWS EC2 server is configured as a self-hosted runner. This configuration enables the GitHub Actions workflow to execute deployments directly to the server where the application is hosted.
 
 a)  **Runner Registration:** Accessed Settings > Actions > Runners within the GitHub repository and chose New self-hosted runner for Linux (x64).
@@ -80,8 +96,8 @@ c)  **Activating the Agent:** Initiate the runner by executing `./run.sh` within
 
 ---
 
-### **6. Step 4: Configure GitHub Repository Files**
-<a name="6-step-4-configure-github-repository-files"></a>
+### **7. Step 4: Configure GitHub Repository Files**
+<a name="7-step-4-configure-github-repository-files"></a>
 The operational framework of this automation system is supported by three essential repository files.
 
 #### **The Dockerfile: The System's Blueprint**
@@ -182,24 +198,30 @@ jobs:
           sleep 6
           docker system prune -f
 ```
-* **`stages`**: I broke my pipeline into three logical stages:
-    1.  **Clone Code:** Jenkins uses its Git plugin to clone my repository.
-    2.  **Build Docker Image:** This step isn't strictly necessary since `docker compose` can also build, but I included it as an explicit step to make the process clearer.
-    3.  **Deploy:** This is the magic step. `docker compose down || true` stops and removes any old running containers (the `|| true` prevents the pipeline from failing if there are no containers to stop). Then, `docker compose up -d --build` starts the application in the background, rebuilding the `flask` image to include the new code changes.
+This GitHub Actions workflow comprises four continuous stages as stated below, each of which executes on the self-hosted runner (AWS EC2 instance) and performs a distinct component of the CI/CD pipeline.
+    1.  **Stage 1: Checkout and Setup (checkout)** Executes automatically upon code submission to the primary branch. The objective is to downloads the repository files onto the self-hosted runner.
+    2.  **Stage 2: Build and Push Image (build)** Builds a fresh Docker container image and publishes it to Docker Hub after checkout phase finishes successfully. Includes building the image using the local `Dockerfile`, applies two tags; the unique Git commit hash `$GIT_SHA` for version tracking and `latest` for easy deployment, as well as pushes both tagged images to the Docker Hub repository. 
+    3.  **Stage 3: Security Scan with Trivy (scan)** Once the Docker image is built and pushed. This phase scans the newly created Docker image for security vulnerabilities before deploying it by running `trivy image` against the `latest` Docker image to detect OS packages and software dependency discrepency.
+    4. **Stage 4: Deploy on EC2 (deploy)** Runs after passing the security scan by replacing the old running application with the newly updated Docker container. 
 
 ---
 
-### **7. Step 5: Bringing It All Together with a Jenkins Pipeline**
-<a name="7-step-5-bringing-it-all-together-with-a-jenkins-pipeline"></a>
-With all the pieces in place, the final step was to create the pipeline job in Jenkins.
-1.  I created a new "Pipeline" job in the Jenkins dashboard.
-2.  Instead of writing the script in the text box, I configured it to pull the **"Pipeline script from SCM"**.
-3.  I pointed it to my GitHub repository and told it the script file was named `Jenkinsfile`.
+### **8. Step 5: Consolidating the GitHub Actions Pipeline**
+<a name="8-step-5-consolidating-the-github-actions-pipeline"></a>
+With the runner established and GitHub repository secrets (DOCKERHUB_USERNAME and DOCKERHUB_TOKEN) properly configured:
 
-I then clicked **"Build Now"** to run the pipeline for the first time. I watched the logs in the "Console Output" as Jenkins cloned my code, built the image, and deployed the containers. After it finished, I was able to access my live application at `http://<my-ec2-ip>:5000`.
+**Triggering Deployment:** A commit pushed to the main branch automatically activates the GitHub Actions workflow.
+
+**Verification & Testing:** The self-hosted runner notices the job, constructs the image, applies tags using the Git commit hash with latest designation, and then transmits it to the Docker Hub.
+
+Trivy performs an automated security assessment on the container image.
+
+The deployment phase terminates any existing flaskapp container, retrieves the most recent image, and establishes a new container operating on port 5000.
+
+**Validating Application:** Navigating to http://<EC2-PUBLIC-IP>:5000 through a web browser displays the operational application output: hello everyone from github actions happy learning
 
 ---
 
-### **8. Final Thoughts and Conclusion**
-<a name="8-final-thoughts-and-conclusion"></a>
-This project was a fantastic journey through the core components of a modern DevOps workflow. I successfully built a fully automated CI/CD pipeline where a simple `git push` results in a live deployment. By containerizing the application with Docker, I've made it portable and consistent. By automating the process with Jenkins, I've made it fast, reliable, and repeatable. Any future changes to my application will now be deployed seamlessly, showcasing the true power of CI/CD.
+### **9. Conclusion**
+<a name="9-conclusion"></a>
+This project effectively converted a manual and error-prone deployment workflow into a streamlined, secure continuous integration and continuous deployment pipeline utilizing GitHub Actions and AWS EC2 infrastructure. Through the implementation of PuTTY for secure shell protocol administration, establishment of a self-hosted runner on EC2, containerization via Docker, and incorporation of automated Trivy vulnerability assessment, each code modification directed to production undergoes comprehensive validation, security analysis, construction, and deployment with minimal friction.
