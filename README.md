@@ -89,11 +89,13 @@ c)  **Permissions:** Enabled and initiated the Docker daemon through the command
 An AWS EC2 server is configured as a self-hosted runner. This configuration enables the GitHub Actions workflow to execute deployments directly to the server where the application is hosted.
 
 a)  **Runner Registration:** Accessed Settings > Actions > Runners within the GitHub repository and chose New self-hosted runner for Linux (x64).
+
 b)  **Installation Steps on EC2:** 
    Established a dedicated directory: `mkdir actions-runner && cd actions-runner`.
    Obtained and decompressed the most recent GitHub Actions runner package.
    Initialized the  runner through `./config.sh --url <REPO_URL> --token 
    <REGISTRATION_TOKEN>`.
+   
 c)  **Activating the Agent:** Initiate the runner by executing `./run.sh` within the PuTTY session to commence monitoring for incoming workflow jobs activated by GitHub commits.
 
 ---
@@ -201,10 +203,10 @@ jobs:
           docker system prune -f
 ```
 This GitHub Actions workflow comprises four continuous stages as stated below, each of which executes on the self-hosted runner (AWS EC2 instance) and performs a distinct component of the CI/CD pipeline.
-    1.  **Stage 1: Checkout and Setup (checkout)** Executes automatically upon code submission to the primary branch. The objective is to downloads the repository files onto the self-hosted runner.
-    2.  **Stage 2: Build and Push Image (build)** Builds a fresh Docker container image and publishes it to Docker Hub after checkout phase finishes successfully. Includes building the image using the local `Dockerfile`, applies two tags; the unique Git commit hash `$GIT_SHA` for version tracking and `latest` for easy deployment, as well as pushes both tagged images to the Docker Hub repository. 
-    3.  **Stage 3: Security Scan with Trivy (scan)** Once the Docker image is built and pushed. This phase scans the newly created Docker image for security vulnerabilities before deploying it by running `trivy image` against the `latest` Docker image to detect OS packages and software dependency discrepency.
-    4. **Stage 4: Deploy on EC2 (deploy)** Runs after passing the security scan by replacing the old running application with the newly updated Docker container. 
+*  **Stage 1: Checkout and Setup (checkout)** Executes automatically upon code submission to the primary branch. The objective is to downloads the repository files onto the self-hosted runner.
+* **Stage 2: Build and Push Image (build)** Builds a fresh Docker container image and publishes it to Docker Hub after checkout phase finishes successfully. Includes building the image using the local `Dockerfile`, applies two tags; the unique Git commit hash `$GIT_SHA` for version tracking and `latest` for easy deployment, as well as pushes both tagged images to the Docker Hub repository. 
+* **Stage 3: Security Scan with Trivy (scan)** Once the Docker image is built and pushed. This phase scans the newly created Docker image for security vulnerabilities before deploying it by running `trivy image` against the `latest` Docker image to detect OS packages and software dependency discrepency.
+* **Stage 4: Deploy on EC2 (deploy)** Runs after passing the security scan by replacing the old running application with the newly updated Docker container. 
 
 ---
 
